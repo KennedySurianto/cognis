@@ -64,7 +64,10 @@ export async function POST(req: Request) {
       p_document_id: selectedFileId || null
     })
 
-    if (matchError) throw new Error('Failed to retrieve context')
+    if (matchError) {
+      console.error('Supabase RPC Error:', matchError)
+      throw new Error('Failed to retrieve context')
+    }
 
     const contextText = chunks?.map((chunk: { content: string }) => chunk.content).join('\n\n---\n\n') || 'No relevant documents found.'
 

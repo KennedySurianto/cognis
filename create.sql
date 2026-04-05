@@ -29,40 +29,52 @@ DROP COLUMN embedding;
 ALTER TABLE document_chunks 
 ADD COLUMN embedding vector(3072);
 
+-- Replace 'document_chunks_document_id_fkey' with your actual constraint name if different
+ALTER TABLE document_chunks
+DROP CONSTRAINT IF EXISTS document_chunks_document_id_fkey,
+ADD CONSTRAINT document_chunks_document_id_fkey
+  FOREIGN KEY (document_id)
+  REFERENCES documents(id)
+  ON DELETE CASCADE;
+
 -- 4. Create an HNSW index for sub-millisecond similarity search
 -- This prevents the database from scanning every single row during a chat query
 create index on document_chunks using hnsw (embedding vector_cosine_ops);
 
 
 
-create or replace function match_document_chunks (
-  query_embedding vector(768),
+-- 1. Completely remove the old version (with the old return types)
+DROP FUNCTION IF EXISTS match_document_chunks(vector, double precision, integer, uuid, uuid);
+
+-- 2. Create the corrected version with the 'id bigint' return type
+CREATE OR REPLACE FUNCTION match_document_chunks (
+  query_embedding vector(3072),
   match_threshold float,
   match_count int,
-  p_user_id uuid
+  p_user_id uuid,
+  p_document_id uuid DEFAULT NULL
 )
-returns table (
-  id bigint,
-  document_id uuid,
+RETURNS TABLE (
+  id bigint,       -- Matches your actual table structure
   content text,
   similarity float
 )
-language plpgsql stable
-as $$
-begin
-  return query
-  select
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
     dc.id,
-    dc.document_id,
     dc.content,
-    1 - (dc.embedding <=> query_embedding) as similarity
-  from document_chunks dc
-  join documents d on d.id = dc.document_id
-  where d.user_id = p_user_id -- Strict tenant isolation
-    and 1 - (dc.embedding <=> query_embedding) > match_threshold
-  order by dc.embedding <=> query_embedding
-  limit match_count;
-end;
+    1 - (dc.embedding <=> query_embedding) AS similarity
+  FROM document_chunks dc
+  JOIN documents d ON d.id = dc.document_id
+  WHERE d.user_id = p_user_id
+    AND (1 - (dc.embedding <=> query_embedding) > match_threshold)
+    AND (p_document_id IS NULL OR dc.document_id = p_document_id)
+  ORDER BY similarity DESC
+  LIMIT match_count;
+END;
 $$;
 
 
