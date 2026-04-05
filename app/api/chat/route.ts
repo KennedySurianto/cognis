@@ -20,7 +20,7 @@ export const runtime = 'edge'
 
 export async function POST(req: Request) {
   try {
-    const { messages }: { messages: UIMessage[] } = await req.json()
+    const { messages, selectedFileId }: { messages: UIMessage[], selectedFileId?: string } = await req.json()
     
     const latestMsg = messages[messages.length - 1]
     const latestMessageText = latestMsg?.content || (latestMsg?.parts?.[0]?.text ?? '')
@@ -61,6 +61,7 @@ export async function POST(req: Request) {
       match_threshold: 0.3,
       match_count: 5,
       p_user_id: user.id,
+      p_document_id: selectedFileId || null
     })
 
     if (matchError) throw new Error('Failed to retrieve context')

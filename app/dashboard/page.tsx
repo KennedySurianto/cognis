@@ -75,7 +75,7 @@ export default async function DashboardPage() {
       </aside>
 
       {/* Injecting the Chat Interface Component */}
-      <ChatInterface />
+      <ChatInterface documents={documents || []} />
 
     </div>
   )
